@@ -1,160 +1,80 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+from flask import Flask, request, jsonify, render_template
+import json
 
-# C extensions
-*.so
+app = Flask(__name__)
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Load student details from JSON file
+with open('students.json') as f:
+    students = json.load(f)
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# Load Student Details API
+@app.route('/api/students', methods=['GET'])
+def load_students():
+    page = int(request.args.get('page', 1))
+    page_size = int(request.args.get('pageSize', 10))
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+    paginated_students = students[start_index:end_index]
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+    return jsonify({
+        'data': paginated_students,
+        'totalItems': len(students),
+        'totalPages': (len(students) + page_size - 1) // page_size
+    })
 
-# Translations
-*.mo
-*.pot
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+# Server-side Filtering API
+@app.route('/api/students/filter', methods=['POST'])
+def filter_students_api():
+    if request.content_type != 'application/json':
+        return jsonify({'error': 'Unsupported Media Type'}), 415
 
-# Flask stuff:
-instance/
-.webassets-cache
+    filter_criteria = request.json.get('filterCriteria')
+    filtered_students = []
 
-# Scrapy stuff:
-.scrapy
+    if filter_criteria:
+        for student in students:
+            # Filter based on the provided criteria
+            if (
+                str(filter_criteria).lower() in str(student['id']).lower()
+                or str(filter_criteria).lower() in student['name'].lower()
+                or str(filter_criteria).lower() in str(student['totalMarks']).lower()
+            ):
+                filtered_students.append(student)
+    else:
+        filtered_students = students
 
-# Sphinx documentation
-docs/_build/
+    return jsonify({
+        'data': filtered_students,
+        'totalItems': len(filtered_students),
+        'totalPages': 1
+    })
 
-# PyBuilder
-.pybuilder/
-target/
 
-# Jupyter Notebook
-.ipynb_checkpoints
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        filter_criteria = request.form.get('filterCriteria')
+        filtered_students = []
 
-# IPython
-profile_default/
-ipython_config.py
+        if filter_criteria:
+            for student in students:
+                # Filter based on the provided criteria
+                if (
+                        str(filter_criteria).lower() in str(student['id']).lower()
+                        or str(filter_criteria).lower() in student['name'].lower()
+                        or str(filter_criteria).lower() in str(student['totalMarks']).lower()
+                ):
+                    filtered_students.append(student)
+        else:
+            filtered_students = students
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
+        return render_template('index.html', students=filtered_students)
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+    return render_template('index.html', students=students)
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
 
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
-.pdm.toml
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+# Start the server
+if __name__ == '__main__':
+    app.run(debug=True)
